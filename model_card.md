@@ -59,16 +59,22 @@ Prompts:
 
 ---
 
-## 6. Limitations and Bias 
+## 6. Limitations and Bias
 
-Where the system struggles or behaves unfairly. 
+**Primary weakness — categorical bonuses override the primary perceptual axis.**
+The genre and mood bonuses together award up to 2.0 fixed points, while energy — the feature users feel most consciously — can contribute at most 2.0 points only when the match is perfect. In adversarial testing, a song with energy=0.28 ranked #1 for a user who requested energy=0.95, purely because it matched on genre and mood labels; the energetically correct song (energy=0.91) was buried at #4. This means the system can be "tricked" by any user whose genre preference conflicts with their energy preference — a real pattern for listeners who want, for example, calm ambient music during a workout.
 
-Prompts:  
+**Lofi filter bubble.**
+Lofi is the only genre with three catalog entries (17% of all songs), and all three sit in a narrow low-energy band (0.35–0.42). Any user who prefers low energy — regardless of whether they like lofi — will see lofi songs dominate positions #2 and #3 in almost every run. This is not because lofi is the best match; it is because it is the only genre with enough catalog depth to compete numerically. A listener who prefers quiet classical or acoustic blues is silently funneled toward a genre they may not want.
 
-- Features it does not consider  
-- Genres or moods that are underrepresented  
-- Cases where the system overfits to one preference  
-- Ways the scoring might unintentionally favor some users  
+**Genre equity gap — absent genres carry a permanent scoring penalty.**
+Thirteen of the fifteen genres in the catalog appear exactly once. A user whose preferred genre is not represented at all (k-pop, folk, trap, bossa nova) can never earn the +1.0 genre bonus, reducing their maximum achievable score from 6.0 to 5.0 with no explanation given. In a real system this would systematically under-serve listeners from musical cultures outside the catalog's implicit demographic, which skews toward Western popular and electronic genres.
+
+**Dark valence desert.**
+Only two songs have valence below 0.40 — Iron Collapse (0.25) and Empty Porch Blues (0.32). A user who prefers emotionally dark or melancholic music will always receive recommendations that score numerically adequate but feel emotionally wrong, because the catalog simply has no density in that quadrant. The system has no mechanism to signal this gap, so it silently substitutes mid-valence songs without transparency.
+
+**No diversity control.**
+The ranking is a pure score sort with no penalty for repeated artists, genres, or adjacent moods. In a catalog this small, the top 5 results can cluster entirely within one or two genres whenever the genre bonus fires, producing a list that feels narrow even when other areas of the catalog might provide genuine variety.  
 
 ---
 

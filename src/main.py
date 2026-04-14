@@ -20,7 +20,7 @@ def run_profile(label: str, user_prefs: dict, songs: list, k: int = 5) -> None:
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
         print(f"\n  #{rank}  {song['title']}  —  {song['artist']}")
         print(f"       Genre: {song['genre']}  |  Mood: {song['mood']}")
-        print(f"       Score : {score:.2f} / 6.5")
+        print(f"       Score : {score:.2f} / 6.0")
         print(f"       Why   : {explanation}")
 
 

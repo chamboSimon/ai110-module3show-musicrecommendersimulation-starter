@@ -108,10 +108,10 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     Scores a single song against user preferences.
     Required by recommend_songs() and src/main.py
 
-    Scoring recipe (max 6.5 pts):
-      +2.0  genre exact match
+    Scoring recipe (max 6.0 pts):
+      +1.0  genre exact match   (was +2.0 — halved so energy leads)
       +1.0  mood exact match
-      +1.5  energy similarity   (1.5 × (1 - |song - target|))
+      +2.0  energy similarity   (was +1.5 — doubled; primary perceptual axis)
       +1.0  valence similarity  (1.0 × (1 - |song - target|))
       +0.5  acousticness similarity
       +0.5  danceability similarity
@@ -120,14 +120,14 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     reasons = []
 
     if song["genre"] == user_prefs["genre"]:
-        score += 2.0
-        reasons.append("genre match (+2.0)")
+        score += 1.0
+        reasons.append("genre match (+1.0)")
 
     if song["mood"] == user_prefs["mood"]:
         score += 1.0
         reasons.append("mood match (+1.0)")
 
-    energy_pts = 1.5 * (1 - abs(song["energy"] - user_prefs["energy"]))
+    energy_pts = 2.0 * (1 - abs(song["energy"] - user_prefs["energy"]))
     score += energy_pts
     reasons.append(f"energy similarity (+{energy_pts:.2f})")
 
