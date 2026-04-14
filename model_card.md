@@ -1,61 +1,73 @@
 # 🎧 Model Card: Music Recommender Simulation
 
-## 1. Model Name  
+## 1. Model Name
 
-Give your model a short, descriptive name.  
-Example: **VibeFinder 1.0**  
+**VibeFinder 1.0**
 
----
-
-## 2. Intended Use  
-
-Describe what your recommender is designed to do and who it is for. 
-
-Prompts:  
-
-- What kind of recommendations does it generate  
-- What assumptions does it make about the user  
-- Is this for real users or classroom exploration  
+A content-based music recommender that scores songs by how closely their sonic features match a listener's stated taste preferences.
 
 ---
 
-## 3. How the Model Works  
+## 2. Intended Use
 
-Explain your scoring approach in simple language.  
+VibeFinder 1.0 is designed to suggest songs from a small catalog based on a user's self-described taste — things like how energetic, emotionally bright, or acoustic they want their music to be. It is built for classroom exploration and learning, not for real users or production deployment.
 
-Prompts:  
+The system assumes the user can describe their preferences numerically. It does not learn from listening history or adapt over time. Each recommendation is a one-shot calculation with no memory of previous sessions.
 
-- What features of each song are used (genre, energy, mood, etc.)  
-- What user preferences are considered  
-- How does the model turn those into a score  
-- What changes did you make from the starter logic  
+**What it is for:**
+- Demonstrating how content-based filtering works
+- Exploring how different feature weights change recommendation behavior
+- Understanding why scoring systems can produce unexpected or biased results
 
-Avoid code here. Pretend you are explaining the idea to a friend who does not program.
-
----
-
-## 4. Data  
-
-Describe the dataset the model uses.  
-
-Prompts:  
-
-- How many songs are in the catalog  
-- What genres or moods are represented  
-- Did you add or remove data  
-- Are there parts of musical taste missing in the dataset  
+**What it is not for:**
+- Discovering new or niche artists (the catalog is too small)
+- Replacing human curation or editorial playlists
+- Making recommendations for real listeners in a real product
+- Any context where fairness, diversity, or catalog completeness actually matters
 
 ---
 
-## 5. Strengths  
+## 3. How the Model Works
 
-Where does your system seem to work well  
+Think of each song as having a report card with six scores: how energetic it is, how emotionally bright or dark it sounds, how acoustic or electronic the production feels, how groovy and rhythmic it is, what genre it belongs to, and what mood it has.
 
-Prompts:  
+When a listener says what they want — "I want something calm, warm, and acoustic" — the system compares that description to every song's report card. Songs that are closer to the description score more points. Songs that are far away score fewer.
 
-- User types for which it gives reasonable results  
-- Any patterns you think your scoring captures correctly  
-- Cases where the recommendations matched your intuition  
+Genre and mood work slightly differently. Instead of measuring distance, they award a flat bonus if the label matches exactly. A song labeled "lofi" earns an extra point for a user who says they like lofi. A song labeled "chill" earns an extra point for a user who says they want chill. If neither label matches, no bonus is awarded.
+
+After every song is scored, the list is sorted from highest to lowest, and the top five are returned as recommendations.
+
+The key design choice is that **energy carries the most weight**. Being close to the user's requested energy level is worth up to 2.0 points out of 6.0. Genre and mood each contribute at most 1.0 point. This reflects the idea that energy — how calm or intense a song feels — is the feature listeners notice most when a recommendation feels wrong.
+
+---
+
+## 4. Data
+
+The catalog contains **18 songs** stored in a CSV file. Ten songs came from the project starter; eight were added to improve coverage.
+
+**What is represented:**
+- 15 genres: pop, lofi, rock, ambient, jazz, synthwave, indie pop, hip-hop, classical, r&b, country, metal, reggae, edm, blues
+- 14 moods: happy, chill, intense, relaxed, focused, moody, energized, serene, romantic, nostalgic, angry, dreamy, euphoric, melancholic
+- Six numeric features per song: energy, valence (emotional brightness), acousticness, danceability, tempo in BPM
+
+**What is missing:**
+- Most genres have only one song. Lofi is the exception with three.
+- There are almost no songs in the low-valence (dark/sad) range. Only two songs score below 0.40 on valence.
+- No lyrics, no audio files, no images, no artist metadata beyond a name.
+- All songs are fictional. The catalog reflects the choices of one person building an exercise, not real listener data.
+- No songs representing genres common in non-Western music markets (Afrobeats, K-pop, Latin trap, Bollywood).
+
+---
+
+## 5. Strengths
+
+The system works well when the user's preferences are clear and the catalog has a matching song.
+
+For the three core profiles tested — High-Energy Pop, Chill Lofi, and Deep Intense Rock — the top result in every case was obviously correct and scored above 5.5 out of 6.0. The system cleanly separated opposite listener types: the pop listener's top results share nothing with the lofi listener's top results, which is exactly what should happen.
+
+The scoring is fully transparent. Every point is explained — you can see exactly why a song ranked where it did. There are no hidden layers, no black box decisions, and no randomness. This makes it easy to understand and debug, which is useful for learning.
+
+The system also handles features correctly as a matter of proximity, not magnitude. It does not recommend the loudest or most energetic songs by default. It recommends the songs closest to whatever the user asked for, whether that is high energy or low.
 
 ---
 
@@ -74,7 +86,7 @@ Thirteen of the fifteen genres in the catalog appear exactly once. A user whose 
 Only two songs have valence below 0.40 — Iron Collapse (0.25) and Empty Porch Blues (0.32). A user who prefers emotionally dark or melancholic music will always receive recommendations that score numerically adequate but feel emotionally wrong, because the catalog simply has no density in that quadrant. The system has no mechanism to signal this gap, so it silently substitutes mid-valence songs without transparency.
 
 **No diversity control.**
-The ranking is a pure score sort with no penalty for repeated artists, genres, or adjacent moods. In a catalog this small, the top 5 results can cluster entirely within one or two genres whenever the genre bonus fires, producing a list that feels narrow even when other areas of the catalog might provide genuine variety.  
+The ranking is a pure score sort with no penalty for repeated artists, genres, or adjacent moods. In a catalog this small, the top 5 results can cluster entirely within one or two genres whenever the genre bonus fires, producing a list that feels narrow even when other areas of the catalog might provide genuine variety.
 
 ---
 
@@ -98,25 +110,23 @@ The three core profiles all returned an obvious, correct #1 — Sunrise City for
 
 ---
 
-## 8. Future Work  
+## 8. Ideas for Improvement
 
-Ideas for how you would improve the model next.  
+**Expand catalog depth per genre.**
+The single most impactful change would be adding at least 3–5 songs per genre instead of one. Right now the genre bonus always points to the same single song. With more songs per genre, the numeric axes could actually differentiate between good and great matches within a genre — which is how real recommenders work.
 
-Prompts:  
+**Add a catalog gap warning.**
+When a user's preferred genre does not exist in the catalog, the system should say so. Something like "No [k-pop] songs in catalog — showing closest numeric matches instead" would tell the user why their results look different from what they asked for. Silence is the wrong default here.
 
-- Additional features or preferences  
-- Better ways to explain recommendations  
-- Improving diversity among the top results  
-- Handling more complex user tastes  
+**Add a diversity rule to the ranking.**
+Before returning the top 5, check whether any genre or artist appears more than twice. If it does, swap the lower-ranked duplicate out for the next highest-scoring song from a different genre. This prevents the lofi filter bubble and makes the list feel more like a playlist than a repetition.
 
 ---
 
-## 9. Personal Reflection  
+## 9. Personal Reflection
 
-A few sentences about your experience.  
+Building this system made it clear that recommendation is not really about finding "the best song" — it is about defining what "best" means precisely enough for a computer to calculate it. Every weight, every bonus, every scoring rule is a decision about whose taste matters and how much. Those decisions have consequences that are easy to miss until you run the wrong profile and see a quiet ambient track recommended to someone who wanted something loud.
 
-Prompts:  
+The most surprising discovery was how easily a word can override a number. Two matching labels — genre and mood — consistently beat a large energy gap. This makes sense mathematically once you see the weights, but it does not match how humans actually experience music. A person who says "I want something chill" and "I want energy 0.95" has a contradiction in their request, but the system does not notice the contradiction — it just adds up points. Real systems must catch this with additional logic that this simulation does not have.
 
-- What you learned about recommender systems  
-- Something unexpected or interesting you discovered  
-- How this changed the way you think about music recommendation apps  
+This changed how I think about apps like Spotify or YouTube Music. When a recommendation feels wrong, it is usually not a bug — it is the system following its own rules correctly, but the rules were not designed with that edge case in mind. Every recommendation engine is really a set of assumptions about what listeners value, encoded as numbers. The assumptions that go unexamined are the ones that cause the most frustrating results.
