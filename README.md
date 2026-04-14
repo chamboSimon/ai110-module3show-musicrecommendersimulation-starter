@@ -17,17 +17,70 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Real-world recommenders like Spotify and YouTube rely on two main strategies: collaborative filtering, which surfaces songs that users with similar taste enjoyed, and content-based filtering, which matches songs based on their sonic attributes. This simulation uses content-based filtering. Rather than recommending the most energetic or most acoustic songs in absolute terms, it scores each song by how close it sits to the user's stated preferences — then adds bonus points when categorical labels (genre, mood) match exactly.
 
-Some prompts to answer:
+### `Song` Features
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+Each `Song` object stores the following attributes read from `data/songs.csv`:
 
-You can include a simple diagram or bullet list if helpful.
+| Field | Type | Role in scoring |
+|---|---|---|
+| `id` | int | Unique identifier, not scored |
+| `title` | str | Display name, not scored |
+| `artist` | str | Display name, not scored |
+| `genre` | str | Categorical — earns +2.0 pts on exact match |
+| `mood` | str | Categorical — earns +1.0 pt on exact match |
+| `energy` | float 0–1 | Numeric similarity, up to +1.5 pts |
+| `valence` | float 0–1 | Numeric similarity, up to +1.0 pts |
+| `acousticness` | float 0–1 | Numeric similarity, up to +0.5 pts |
+| `danceability` | float 0–1 | Numeric similarity, up to +0.5 pts |
+
+### `UserProfile` Features
+
+Each `UserProfile` stores a preference value for each scored feature:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `favorite_genre` | str | Target genre for categorical bonus |
+| `favorite_mood` | str | Target mood for categorical bonus |
+| `target_energy` | float 0–1 | Desired arousal level |
+| `target_valence` | float 0–1 | Desired emotional tone (dark → bright) |
+| `target_acousticness` | float 0–1 | Preference for organic vs. electronic texture |
+| `target_danceability` | float 0–1 | Preference for rhythmic engagement |
+
+### Algorithm Recipe
+
+Every song is passed through `score_song()` in `src/recommender.py`. Rules are applied in order and all points accumulate:
+
+```
+score = 0
+
+if song.genre == user.favorite_genre  →  score += 2.0   # genre match
+if song.mood  == user.favorite_mood   →  score += 1.0   # mood match
+
+score += 1.5 × (1 - |song.energy       - user.target_energy|)
+score += 1.0 × (1 - |song.valence      - user.target_valence|)
+score += 0.5 × (1 - |song.acousticness - user.target_acousticness|)
+score += 0.5 × (1 - |song.danceability - user.target_danceability|)
+
+maximum possible score: 6.5 pts
+```
+
+**Why these weights?** Genre is the strongest identity signal — a jazz listener rarely accepts metal regardless of other matches, so it earns the most points. Mood is softer because the same label (e.g. "chill") appears across multiple genres. Energy is the most important numeric axis because its real-world spread in the catalog is widest and users feel it most consciously. Valence (emotional brightness) refines within an energy level. Acousticness and danceability are texture preferences that break ties.
+
+### Ranking Rule (full catalog)
+
+1. Call `score_song(user_prefs, song)` for every song in the catalog — no songs are skipped
+2. Collect all `(song, score, explanation)` tuples into a list
+3. Sort the list by score descending
+4. Return the top `k` results
+
+### Known Biases
+
+- **Genre over-dominance.** A +2.0 genre bonus is so large it can lift a mediocre genre match above a near-perfect cross-genre song. A lofi track with the wrong energy could still outrank an ambient track that fits the user's numeric profile almost perfectly.
+- **Exact-match brittleness.** Genre and mood comparisons are case-sensitive string equality. "Lofi" and "lofi" score differently, and adjacent moods like "relaxed" and "chill" earn zero shared credit even though a listener would likely enjoy both.
+- **Catalog skew.** The 18-song catalog has uneven genre coverage (3 lofi songs, 1 blues, 1 reggae). Users who prefer underrepresented genres have fewer candidates to score well, so the numeric axes do more of the work and the top result may feel like a compromise.
+- **No diversity control.** The ranking is a pure score sort, so the top 5 results could all be songs by the same artist or in the same sub-genre if they cluster near the user's preferences.
 
 ---
 
