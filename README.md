@@ -121,11 +121,217 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
+Six profiles were run against the 18-song catalog: three core listener types and three adversarial edge cases designed to expose weaknesses in the scoring logic.
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+---
+
+### CORE 1 — High-Energy Pop
+
+Profile: `genre=pop  mood=happy  energy=0.88  valence=0.85`
+
+```
+  #1  Sunrise City  —  Neon Echo
+       Genre: pop  |  Mood: happy
+       Score : 6.32 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.41)
+
+  #2  Gym Hero  —  Max Pulse
+       Genre: pop  |  Mood: intense
+       Score : 5.32 / 6.5
+       Why   : genre match (+2.0), energy similarity (+1.42)
+
+  #3  Rooftop Lights  —  Indigo Parade
+       Genre: indie pop  |  Mood: happy
+       Score : 4.12 / 6.5
+       Why   : mood match (+1.0), energy similarity (+1.32)
+
+  #4  Zenith Drop  —  Pulse Circuit
+       Genre: edm  |  Mood: euphoric
+       Score : 3.30 / 6.5
+       Why   : energy similarity (+1.40)
+
+  #5  Street Frequency  —  DJ Mosaic
+       Genre: hip-hop  |  Mood: energized
+       Score : 3.13 / 6.5
+       Why   : energy similarity (+1.35)
+```
+
+**Observation:** Works as expected. Sunrise City is a near-perfect match (6.32/6.5). Gym Hero earns #2 on genre alone despite its mood being "intense" — demonstrating that the +2.0 genre bonus can compensate for a mood mismatch.
+
+---
+
+### CORE 2 — Chill Lofi
+
+Profile: `genre=lofi  mood=chill  energy=0.38  valence=0.58`
+
+```
+  #1  Library Rain  —  Paper Lanterns
+       Genre: lofi  |  Mood: chill
+       Score : 6.41 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.46)
+
+  #2  Midnight Coding  —  LoRoom
+       Genre: lofi  |  Mood: chill
+       Score : 6.36 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.44)
+
+  #3  Focus Flow  —  LoRoom
+       Genre: lofi  |  Mood: focused
+       Score : 5.44 / 6.5
+       Why   : genre match (+2.0), energy similarity (+1.47)
+
+  #4  Spacewalk Thoughts  —  Orbit Bloom
+       Genre: ambient  |  Mood: chill
+       Score : 4.13 / 6.5
+       Why   : mood match (+1.0), energy similarity (+1.35)
+
+  #5  Coffee Shop Stories  —  Slow Stereo
+       Genre: jazz  |  Mood: relaxed
+       Score : 3.29 / 6.5
+       Why   : energy similarity (+1.48)
+```
+
+**Observation:** Top 3 are all lofi — the genre bonus creates a strong cluster. Focus Flow at #3 scores 5.44 despite a mood mismatch ("focused" ≠ "chill"), purely on genre + energy proximity. The gap between #3 (5.44) and #4 (4.13) shows how much the genre bonus dominates.
+
+---
+
+### CORE 3 — Deep Intense Rock
+
+Profile: `genre=rock  mood=intense  energy=0.92  valence=0.42`
+
+```
+  #1  Storm Runner  —  Voltline
+       Genre: rock  |  Mood: intense
+       Score : 6.41 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.48)
+
+  #2  Gym Hero  —  Max Pulse
+       Genre: pop  |  Mood: intense
+       Score : 3.98 / 6.5
+       Why   : mood match (+1.0), energy similarity (+1.48)
+
+  #3  Iron Collapse  —  Fracture Point
+       Genre: metal  |  Mood: angry
+       Score : 3.15 / 6.5
+       Why   : energy similarity (+1.43)
+
+  #4  Night Drive Loop  —  Neon Echo
+       Genre: synthwave  |  Mood: moody
+       Score : 3.08 / 6.5
+       Why   : energy similarity (+1.24)
+
+  #5  Street Frequency  —  DJ Mosaic
+       Genre: hip-hop  |  Mood: energized
+       Score : 2.96 / 6.5
+       Why   : energy similarity (+1.29)
+```
+
+**Observation:** Storm Runner is the obvious #1 with 6.41/6.5. Only one rock song exists in the catalog — so #2 onward is drawn from adjacent energy levels across unrelated genres. Iron Collapse (metal) reaches #3 on energy alone, even though its valence (0.25) is far darker than the profile target (0.42).
+
+---
+
+### EDGE 1 — Ghost Genre (k-pop not in catalog)
+
+Profile: `genre=k-pop  mood=happy  energy=0.80  valence=0.82`
+
+```
+  #1  Sunrise City  —  Neon Echo
+       Genre: pop  |  Mood: happy
+       Score : 4.41 / 6.5
+       Why   : mood match (+1.0), energy similarity (+1.47)
+
+  #2  Rooftop Lights  —  Indigo Parade
+       Genre: indie pop  |  Mood: happy
+       Score : 4.32 / 6.5
+       Why   : mood match (+1.0), energy similarity (+1.44)
+
+  #3  Street Frequency  —  DJ Mosaic
+       Genre: hip-hop  |  Mood: energized
+       Score : 3.28 / 6.5
+       Why   : energy similarity (+1.47)
+
+  #4  Gym Hero  —  Max Pulse
+       Genre: pop  |  Mood: intense
+       Score : 3.19 / 6.5
+       Why   : energy similarity (+1.30)
+
+  #5  Zenith Drop  —  Pulse Circuit
+       Genre: edm  |  Mood: euphoric
+       Score : 3.11 / 6.5
+       Why   : energy similarity (+1.28)
+```
+
+**Finding:** No song earns the +2.0 genre bonus — the maximum achievable score drops to 4.5. The top result (4.41/6.5) would be a mediocre result in any other profile. The numeric axes hold up well, surfacing the sonically closest songs (pop, indie pop), but the system has no way to signal to the user that their preferred genre is absent.
+
+---
+
+### EDGE 2 — Energy-Mood Conflict (energy=0.95, mood=chill)
+
+Profile: `genre=ambient  mood=chill  energy=0.95  valence=0.50`
+
+```
+  #1  Spacewalk Thoughts  —  Orbit Bloom
+       Genre: ambient  |  Mood: chill
+       Score : 5.09 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+0.50)
+
+  #2  Midnight Coding  —  LoRoom
+       Genre: lofi  |  Mood: chill
+       Score : 3.48 / 6.5
+       Why   : mood match (+1.0), energy similarity (+0.70)
+
+  #3  Library Rain  —  Paper Lanterns
+       Genre: lofi  |  Mood: chill
+       Score : 3.28 / 6.5
+       Why   : mood match (+1.0), energy similarity (+0.60)
+
+  #4  Storm Runner  —  Voltline
+       Genre: rock  |  Mood: intense
+       Score : 3.14 / 6.5
+       Why   : energy similarity (+1.44)
+
+  #5  Iron Collapse  —  Fracture Point
+       Genre: metal  |  Mood: angry
+       Score : 2.98 / 6.5
+       Why   : energy similarity (+1.47)
+```
+
+**Finding — the system is "tricked."** Spacewalk Thoughts (energy=0.28) wins at #1 despite the user asking for energy=0.95. It earns genre (+2.0) and mood (+1.0) bonuses worth 3.0 pts, which completely overrides its 0.50 energy penalty. The categorical bonuses can outweigh a large numeric mismatch when both genre and mood align. Storm Runner (the energetically correct answer) sits at #4 earning only energy points.
+
+---
+
+### EDGE 3 — Dead Centre (all features = 0.5)
+
+Profile: `genre=jazz  mood=relaxed  energy=0.50  valence=0.50`
+
+```
+  #1  Coffee Shop Stories  —  Slow Stereo
+       Genre: jazz  |  Mood: relaxed
+       Score : 5.88 / 6.5
+       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.30)
+
+  #2  Midnight Coding  —  LoRoom
+       Genre: lofi  |  Mood: chill
+       Score : 3.15 / 6.5
+       Why   : energy similarity (+1.38)
+
+  #3  Focus Flow  —  LoRoom
+       Genre: lofi  |  Mood: focused
+       Score : 3.07 / 6.5
+       Why   : energy similarity (+1.35)
+
+  #4  Dusty Road Home  —  The Riverbend Boys
+       Genre: country  |  Mood: nostalgic
+       Score : 3.06 / 6.5
+       Why   : energy similarity (+1.42)
+
+  #5  Tide & Time  —  Coral Drift
+       Genre: reggae  |  Mood: dreamy
+       Score : 3.04 / 6.5
+       Why   : energy similarity (+1.47)
+```
+
+**Finding — scores compress, categories dominate.** Coffee Shop Stories surges to #1 (5.88/6.5) while #2–#5 are packed in a 0.11-point band (3.04–3.15). With all numeric preferences at the neutral midpoint, every song looks equally "close" on the continuous features — making genre and mood the only real differentiator. The result is correct but fragile: change the genre from "jazz" to anything else and the #1 result swaps entirely.
 
 ---
 
