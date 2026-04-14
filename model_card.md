@@ -78,18 +78,23 @@ The ranking is a pure score sort with no penalty for repeated artists, genres, o
 
 ---
 
-## 7. Evaluation  
+## 7. Evaluation
 
-How you checked whether the recommender behaved as expected. 
+Six user profiles were run against the 18-song catalog. Three were normal listener types — High-Energy Pop, Chill Lofi, and Deep Intense Rock — and three were adversarial profiles built to expose weaknesses.
 
-Prompts:  
+**What we tested and what we were looking for:**
+For the core profiles, the check was simple: does the #1 result feel obviously correct for that listener type? For the edge profiles, the check was whether the scoring logic would break under pressure — a user with contradictory preferences, a user whose favorite genre does not exist in the catalog, and a user with no strong opinion on any feature.
 
-- Which user profiles you tested  
-- What you looked for in the recommendations  
-- What surprised you  
-- Any simple tests or comparisons you ran  
+**What the results confirmed:**
+The three core profiles all returned an obvious, correct #1 — Sunrise City for pop, Library Rain for lofi, Storm Runner for rock. The ordering made intuitive sense and the scores were high (above 5.5 out of 6.0), meaning the top result was a strong match, not just the least-bad option.
 
-No need for numeric metrics unless you created some.
+**What surprised us:**
+
+*The chill mood bonus beat the energy axis.* In the Energy-Mood Conflict profile (energy=0.95, mood=chill), the system ranked Spacewalk Thoughts — a very quiet, calm ambient track — at #1. The user had asked for something intense. The reason is that Spacewalk Thoughts matched on both genre (ambient) and mood (chill), earning 2.0 points from labels alone, which outweighed the energy penalty of recommending a near-silent track to someone who wanted high energy. The system was technically following the rules, but the result would feel completely wrong to a real user.
+
+*The Dead Centre profile revealed that labels decide everything when numbers say nothing.* When all numeric preferences were set to the neutral midpoint (0.5), the scores for positions #2 through #5 collapsed into a 0.09-point band — essentially a four-way tie. The only thing that separated the songs was whether their genre or mood label matched. Coffee Shop Stories jumped to 5.31 out of 6.0 while the next song scored 3.61 — a gap of 1.7 points — purely because it happened to be a jazz track with a "relaxed" mood label. This shows that a user with genuinely neutral or eclectic taste would get results that feel arbitrary.
+
+*The Ghost Genre profile showed that missing catalog coverage is invisible to the user.* A listener who wants k-pop got Sunrise City (a pop song) at #1 with a score of 4.89 out of 6.0, and the system gave no indication that their actual preference was never represented. In a real app, this would silently funnel a k-pop fan toward Western pop without explanation.
 
 ---
 
