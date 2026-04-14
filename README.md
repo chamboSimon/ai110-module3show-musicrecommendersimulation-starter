@@ -11,7 +11,7 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-Replace this paragraph with your own summary of what your version does.
+This project builds a content-based music recommender in Python. It loads an 18-song catalog from a CSV file, scores each song against a user taste profile using a weighted proximity formula, and returns a ranked, explained list of suggestions in the terminal. Three normal listener profiles and three adversarial edge cases were used to test the system and expose scoring weaknesses including filter bubbles, genre equity gaps, and label-override failures.
 
 ---
 
@@ -28,9 +28,9 @@ Each `Song` object stores the following attributes read from `data/songs.csv`:
 | `id` | int | Unique identifier, not scored |
 | `title` | str | Display name, not scored |
 | `artist` | str | Display name, not scored |
-| `genre` | str | Categorical — earns +2.0 pts on exact match |
+| `genre` | str | Categorical — earns +1.0 pt on exact match |
 | `mood` | str | Categorical — earns +1.0 pt on exact match |
-| `energy` | float 0–1 | Numeric similarity, up to +1.5 pts |
+| `energy` | float 0–1 | Numeric similarity, up to +2.0 pts (primary axis) |
 | `valence` | float 0–1 | Numeric similarity, up to +1.0 pts |
 | `acousticness` | float 0–1 | Numeric similarity, up to +0.5 pts |
 | `danceability` | float 0–1 | Numeric similarity, up to +0.5 pts |
@@ -55,18 +55,18 @@ Every song is passed through `score_song()` in `src/recommender.py`. Rules are a
 ```
 score = 0
 
-if song.genre == user.favorite_genre  →  score += 2.0   # genre match
+if song.genre == user.favorite_genre  →  score += 1.0   # genre match
 if song.mood  == user.favorite_mood   →  score += 1.0   # mood match
 
-score += 1.5 × (1 - |song.energy       - user.target_energy|)
+score += 2.0 × (1 - |song.energy       - user.target_energy|)
 score += 1.0 × (1 - |song.valence      - user.target_valence|)
 score += 0.5 × (1 - |song.acousticness - user.target_acousticness|)
 score += 0.5 × (1 - |song.danceability - user.target_danceability|)
 
-maximum possible score: 6.5 pts
+maximum possible score: 6.0 pts
 ```
 
-**Why these weights?** Genre is the strongest identity signal — a jazz listener rarely accepts metal regardless of other matches, so it earns the most points. Mood is softer because the same label (e.g. "chill") appears across multiple genres. Energy is the most important numeric axis because its real-world spread in the catalog is widest and users feel it most consciously. Valence (emotional brightness) refines within an energy level. Acousticness and danceability are texture preferences that break ties.
+**Why these weights?** Energy leads at 2.0× because it is the axis users feel most immediately — a calm song recommended to someone who wants intensity is a worse failure than a wrong genre. Genre and mood each earn 1.0 pt on exact match: they are strong identity signals but should not override a large energy mismatch. Valence refines the emotional tone within an energy level. Acousticness and danceability are texture preferences that break ties. The original genre weight was +2.0 and energy was 1.5× — this was rebalanced after adversarial testing showed genre bonuses were overriding the primary perceptual axis.
 
 ### Ranking Rule (full catalog)
 
@@ -77,10 +77,10 @@ maximum possible score: 6.5 pts
 
 ### Known Biases
 
-- **Genre over-dominance.** A +2.0 genre bonus is so large it can lift a mediocre genre match above a near-perfect cross-genre song. A lofi track with the wrong energy could still outrank an ambient track that fits the user's numeric profile almost perfectly.
-- **Exact-match brittleness.** Genre and mood comparisons are case-sensitive string equality. "Lofi" and "lofi" score differently, and adjacent moods like "relaxed" and "chill" earn zero shared credit even though a listener would likely enjoy both.
-- **Catalog skew.** The 18-song catalog has uneven genre coverage (3 lofi songs, 1 blues, 1 reggae). Users who prefer underrepresented genres have fewer candidates to score well, so the numeric axes do more of the work and the top result may feel like a compromise.
-- **No diversity control.** The ranking is a pure score sort, so the top 5 results could all be songs by the same artist or in the same sub-genre if they cluster near the user's preferences.
+- **Label-override risk.** Even after rebalancing, genre + mood bonuses combined (+2.0 pts) equal the energy maximum (+2.0 pts). A song with very wrong energy can still rank highly if both labels match — proved in the Energy-Mood Conflict experiment.
+- **Exact-match brittleness.** Genre and mood comparisons are case-sensitive string equality. Adjacent moods like "relaxed" and "chill" earn zero shared credit even though a listener would likely enjoy both.
+- **Catalog skew.** The 18-song catalog has uneven genre coverage — 3 lofi songs vs 1 of almost every other genre. Users who prefer low-energy music get a lofi filter bubble regardless of their genre preference.
+- **No diversity control.** The ranking is a pure score sort, so the top 5 results can cluster in one genre when the genre bonus fires repeatedly. See model_card.md for a full bias analysis.
 
 ---
 
@@ -132,31 +132,31 @@ Profile: `genre=pop  mood=happy  energy=0.88  valence=0.85`
 ```
   #1  Sunrise City  —  Neon Echo
        Genre: pop  |  Mood: happy
-       Score : 6.32 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.41)
+       Score : 5.79 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+1.88)
 
   #2  Gym Hero  —  Max Pulse
        Genre: pop  |  Mood: intense
-       Score : 5.32 / 6.5
-       Why   : genre match (+2.0), energy similarity (+1.42)
+       Score : 4.79 / 6.0
+       Why   : genre match (+1.0), energy similarity (+1.90)
 
   #3  Rooftop Lights  —  Indigo Parade
        Genre: indie pop  |  Mood: happy
-       Score : 4.12 / 6.5
-       Why   : mood match (+1.0), energy similarity (+1.32)
+       Score : 4.56 / 6.0
+       Why   : mood match (+1.0), energy similarity (+1.76)
 
   #4  Zenith Drop  —  Pulse Circuit
        Genre: edm  |  Mood: euphoric
-       Score : 3.30 / 6.5
-       Why   : energy similarity (+1.40)
+       Score : 3.77 / 6.0
+       Why   : energy similarity (+1.86)
 
   #5  Street Frequency  —  DJ Mosaic
        Genre: hip-hop  |  Mood: energized
-       Score : 3.13 / 6.5
-       Why   : energy similarity (+1.35)
+       Score : 3.57 / 6.0
+       Why   : energy similarity (+1.80)
 ```
 
-**Observation:** Works as expected. Sunrise City is a near-perfect match (6.32/6.5). Gym Hero earns #2 on genre alone despite its mood being "intense" — demonstrating that the +2.0 genre bonus can compensate for a mood mismatch.
+**Observation:** Works as expected. Sunrise City is a near-perfect match (5.79/6.0). Gym Hero earns #2 via genre match plus near-perfect energy, despite its mood being "intense" not "happy" — showing genre is still a strong signal even after rebalancing.
 
 ---
 
@@ -167,31 +167,31 @@ Profile: `genre=lofi  mood=chill  energy=0.38  valence=0.58`
 ```
   #1  Library Rain  —  Paper Lanterns
        Genre: lofi  |  Mood: chill
-       Score : 6.41 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.46)
+       Score : 5.89 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+1.94)
 
   #2  Midnight Coding  —  LoRoom
        Genre: lofi  |  Mood: chill
-       Score : 6.36 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.44)
+       Score : 5.84 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+1.92)
 
   #3  Focus Flow  —  LoRoom
        Genre: lofi  |  Mood: focused
-       Score : 5.44 / 6.5
-       Why   : genre match (+2.0), energy similarity (+1.47)
+       Score : 4.93 / 6.0
+       Why   : genre match (+1.0), energy similarity (+1.96)
 
   #4  Spacewalk Thoughts  —  Orbit Bloom
        Genre: ambient  |  Mood: chill
-       Score : 4.13 / 6.5
-       Why   : mood match (+1.0), energy similarity (+1.35)
+       Score : 4.58 / 6.0
+       Why   : mood match (+1.0), energy similarity (+1.80)
 
   #5  Coffee Shop Stories  —  Slow Stereo
        Genre: jazz  |  Mood: relaxed
-       Score : 3.29 / 6.5
-       Why   : energy similarity (+1.48)
+       Score : 3.79 / 6.0
+       Why   : energy similarity (+1.98)
 ```
 
-**Observation:** Top 3 are all lofi — the genre bonus creates a strong cluster. Focus Flow at #3 scores 5.44 despite a mood mismatch ("focused" ≠ "chill"), purely on genre + energy proximity. The gap between #3 (5.44) and #4 (4.13) shows how much the genre bonus dominates.
+**Observation:** Top 3 are all lofi — the catalog only has 3 lofi songs and all cluster at low energy, so genre bonus locks them in. Spacewalk Thoughts at #4 (4.58) is now closer to #3 Focus Flow (4.93) than before the weight rebalance — the reduced genre bonus narrowed the gap between lofi and adjacent low-energy songs.
 
 ---
 
@@ -202,31 +202,31 @@ Profile: `genre=rock  mood=intense  energy=0.92  valence=0.42`
 ```
   #1  Storm Runner  —  Voltline
        Genre: rock  |  Mood: intense
-       Score : 6.41 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.48)
+       Score : 5.91 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+1.98)
 
   #2  Gym Hero  —  Max Pulse
        Genre: pop  |  Mood: intense
-       Score : 3.98 / 6.5
-       Why   : mood match (+1.0), energy similarity (+1.48)
+       Score : 4.48 / 6.0
+       Why   : mood match (+1.0), energy similarity (+1.98)
 
   #3  Iron Collapse  —  Fracture Point
        Genre: metal  |  Mood: angry
-       Score : 3.15 / 6.5
-       Why   : energy similarity (+1.43)
+       Score : 3.63 / 6.0
+       Why   : energy similarity (+1.90)
 
   #4  Night Drive Loop  —  Neon Echo
        Genre: synthwave  |  Mood: moody
-       Score : 3.08 / 6.5
-       Why   : energy similarity (+1.24)
+       Score : 3.50 / 6.0
+       Why   : energy similarity (+1.66)
 
   #5  Street Frequency  —  DJ Mosaic
        Genre: hip-hop  |  Mood: energized
-       Score : 2.96 / 6.5
-       Why   : energy similarity (+1.29)
+       Score : 3.39 / 6.0
+       Why   : energy similarity (+1.72)
 ```
 
-**Observation:** Storm Runner is the obvious #1 with 6.41/6.5. Only one rock song exists in the catalog — so #2 onward is drawn from adjacent energy levels across unrelated genres. Iron Collapse (metal) reaches #3 on energy alone, even though its valence (0.25) is far darker than the profile target (0.42).
+**Observation:** Storm Runner is the obvious #1 (5.91/6.0) — genre, mood, and near-perfect energy all align. Only one rock song exists in the catalog, so #2 onward comes from other genres. Gym Hero reaches #2 on mood match plus identical energy proximity, showing that a single mood label is enough to separate it from the rest of the field.
 
 ---
 
@@ -237,31 +237,31 @@ Profile: `genre=k-pop  mood=happy  energy=0.80  valence=0.82`
 ```
   #1  Sunrise City  —  Neon Echo
        Genre: pop  |  Mood: happy
-       Score : 4.41 / 6.5
-       Why   : mood match (+1.0), energy similarity (+1.47)
+       Score : 4.89 / 6.0
+       Why   : mood match (+1.0), energy similarity (+1.96)
 
   #2  Rooftop Lights  —  Indigo Parade
        Genre: indie pop  |  Mood: happy
-       Score : 4.32 / 6.5
-       Why   : mood match (+1.0), energy similarity (+1.44)
+       Score : 4.80 / 6.0
+       Why   : mood match (+1.0), energy similarity (+1.92)
 
   #3  Street Frequency  —  DJ Mosaic
        Genre: hip-hop  |  Mood: energized
-       Score : 3.28 / 6.5
-       Why   : energy similarity (+1.47)
+       Score : 3.77 / 6.0
+       Why   : energy similarity (+1.96)
 
   #4  Gym Hero  —  Max Pulse
        Genre: pop  |  Mood: intense
-       Score : 3.19 / 6.5
-       Why   : energy similarity (+1.30)
+       Score : 3.62 / 6.0
+       Why   : energy similarity (+1.74)
 
   #5  Zenith Drop  —  Pulse Circuit
        Genre: edm  |  Mood: euphoric
-       Score : 3.11 / 6.5
-       Why   : energy similarity (+1.28)
+       Score : 3.54 / 6.0
+       Why   : energy similarity (+1.70)
 ```
 
-**Finding:** No song earns the +2.0 genre bonus — the maximum achievable score drops to 4.5. The top result (4.41/6.5) would be a mediocre result in any other profile. The numeric axes hold up well, surfacing the sonically closest songs (pop, indie pop), but the system has no way to signal to the user that their preferred genre is absent.
+**Finding:** No song earns the genre bonus — k-pop does not exist in the catalog. The maximum achievable score is 5.0 (mood + perfect numeric) instead of 6.0. The system surfaces the sonically closest songs correctly, but gives the user no warning that their preferred genre was never represented.
 
 ---
 
@@ -272,31 +272,31 @@ Profile: `genre=ambient  mood=chill  energy=0.95  valence=0.50`
 ```
   #1  Spacewalk Thoughts  —  Orbit Bloom
        Genre: ambient  |  Mood: chill
-       Score : 5.09 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+0.50)
+       Score : 4.25 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+0.66)
 
   #2  Midnight Coding  —  LoRoom
        Genre: lofi  |  Mood: chill
-       Score : 3.48 / 6.5
-       Why   : mood match (+1.0), energy similarity (+0.70)
+       Score : 3.71 / 6.0
+       Why   : mood match (+1.0), energy similarity (+0.94)
 
-  #3  Library Rain  —  Paper Lanterns
-       Genre: lofi  |  Mood: chill
-       Score : 3.28 / 6.5
-       Why   : mood match (+1.0), energy similarity (+0.60)
-
-  #4  Storm Runner  —  Voltline
+  #3  Storm Runner  —  Voltline
        Genre: rock  |  Mood: intense
-       Score : 3.14 / 6.5
-       Why   : energy similarity (+1.44)
+       Score : 3.62 / 6.0
+       Why   : energy similarity (+1.92)
+
+  #4  Library Rain  —  Paper Lanterns
+       Genre: lofi  |  Mood: chill
+       Score : 3.48 / 6.0
+       Why   : mood match (+1.0), energy similarity (+0.80)
 
   #5  Iron Collapse  —  Fracture Point
        Genre: metal  |  Mood: angry
-       Score : 2.98 / 6.5
-       Why   : energy similarity (+1.47)
+       Score : 3.47 / 6.0
+       Why   : energy similarity (+1.96)
 ```
 
-**Finding — the system is "tricked."** Spacewalk Thoughts (energy=0.28) wins at #1 despite the user asking for energy=0.95. It earns genre (+2.0) and mood (+1.0) bonuses worth 3.0 pts, which completely overrides its 0.50 energy penalty. The categorical bonuses can outweigh a large numeric mismatch when both genre and mood align. Storm Runner (the energetically correct answer) sits at #4 earning only energy points.
+**Finding — the system is still tricked, but less so.** Spacewalk Thoughts (energy=0.28) still wins at #1 despite the user asking for energy=0.95. After the weight rebalance, its lead over Storm Runner (the energetically correct answer) shrank from 1.95 pts down to 0.63 pts. Storm Runner now reaches #3 instead of #4, but the label-matching song still wins because genre + mood bonuses (+2.0 combined) beat the energy mismatch penalty.
 
 ---
 
@@ -307,45 +307,43 @@ Profile: `genre=jazz  mood=relaxed  energy=0.50  valence=0.50`
 ```
   #1  Coffee Shop Stories  —  Slow Stereo
        Genre: jazz  |  Mood: relaxed
-       Score : 5.88 / 6.5
-       Why   : genre match (+2.0), mood match (+1.0), energy similarity (+1.30)
+       Score : 5.31 / 6.0
+       Why   : genre match (+1.0), mood match (+1.0), energy similarity (+1.74)
 
   #2  Midnight Coding  —  LoRoom
        Genre: lofi  |  Mood: chill
-       Score : 3.15 / 6.5
-       Why   : energy similarity (+1.38)
+       Score : 3.61 / 6.0
+       Why   : energy similarity (+1.84)
 
-  #3  Focus Flow  —  LoRoom
-       Genre: lofi  |  Mood: focused
-       Score : 3.07 / 6.5
-       Why   : energy similarity (+1.35)
-
-  #4  Dusty Road Home  —  The Riverbend Boys
+  #3  Dusty Road Home  —  The Riverbend Boys
        Genre: country  |  Mood: nostalgic
-       Score : 3.06 / 6.5
-       Why   : energy similarity (+1.42)
+       Score : 3.53 / 6.0
+       Why   : energy similarity (+1.90)
 
-  #5  Tide & Time  —  Coral Drift
+  #4  Tide & Time  —  Coral Drift
        Genre: reggae  |  Mood: dreamy
-       Score : 3.04 / 6.5
-       Why   : energy similarity (+1.47)
+       Score : 3.53 / 6.0
+       Why   : energy similarity (+1.96)
+
+  #5  Focus Flow  —  LoRoom
+       Genre: lofi  |  Mood: focused
+       Score : 3.52 / 6.0
+       Why   : energy similarity (+1.80)
 ```
 
-**Finding — scores compress, categories dominate.** Coffee Shop Stories surges to #1 (5.88/6.5) while #2–#5 are packed in a 0.11-point band (3.04–3.15). With all numeric preferences at the neutral midpoint, every song looks equally "close" on the continuous features — making genre and mood the only real differentiator. The result is correct but fragile: change the genre from "jazz" to anything else and the #1 result swaps entirely.
+**Finding — scores compress, categories dominate.** Coffee Shop Stories leads at 5.31 while #2–#5 sit within 0.09 points of each other (3.52–3.61) — essentially a four-way tie. With all numeric features at 0.5, every song is equally "close" and labels become the only real differentiator. The gap between #1 and the field (1.70 pts) is entirely due to Coffee Shop Stories matching both genre and mood labels.
 
 ---
 
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
+- **Tiny catalog.** 18 songs is far too small for meaningful variety. Most genres have exactly one entry, so the genre bonus almost always resolves to the same single song with no competition.
+- **No audio understanding.** The system reads numbers from a CSV file. It does not listen to music. All feature values (energy, valence, acousticness) were assigned by hand and reflect one person's judgment, not measured audio properties.
+- **Label brittleness.** Genre and mood are exact string matches. A user who types "Lo-Fi" instead of "lofi" earns zero genre bonus. Adjacent moods like "chill" and "relaxed" share no credit despite overlapping heavily in practice.
+- **Silent failures.** When the system cannot find a good match — missing genre, sparse valence range, conflicting preferences — it returns results anyway with no warning. The output looks the same whether the top result is excellent or just the least-bad option.
+- **No session memory.** Every run is stateless. The system cannot exclude songs you just heard, adapt to a changing mood within a session, or learn from skips and replays.
 
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+See [model_card.md](model_card.md) for a full bias analysis including the lofi filter bubble, genre equity gap, and dark valence desert.
 
 ---
 
@@ -412,110 +410,4 @@ Add a parameter from 0.0 (pure similarity) to 1.0 (pure surprise) that penalizes
 Instead of assigning energy and valence by hand, run actual audio files through a pre-trained model (like a MusicNN or a CLAP embedding) and let the model derive the features automatically. The catalog would become self-describing, and features like "sounds like late 90s trip-hop" could emerge without being explicitly programmed.
 
 
----
-
-## 7. `model_card_template.md`
-
-Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}  
-
-```markdown
-# 🎧 Model Card - Music Recommender Simulation
-
-## 1. Model Name
-
-Give your recommender a name, for example:
-
-> VibeFinder 1.0
-
----
-
-## 2. Intended Use
-
-- What is this system trying to do
-- Who is it for
-
-Example:
-
-> This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, and energy level. It is for classroom exploration only, not for real users.
-
----
-
-## 3. How It Works (Short Explanation)
-
-Describe your scoring logic in plain language.
-
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
-
-Try to avoid code in this section, treat it like an explanation to a non programmer.
-
----
-
-## 4. Data
-
-Describe your dataset.
-
-- How many songs are in `data/songs.csv`
-- Did you add or remove any songs
-- What kinds of genres or moods are represented
-- Whose taste does this data mostly reflect
-
----
-
-## 5. Strengths
-
-Where does your recommender work well
-
-You can think about:
-- Situations where the top results "felt right"
-- Particular user profiles it served well
-- Simplicity or transparency benefits
-
----
-
-## 6. Limitations and Bias
-
-Where does your recommender struggle
-
-Some prompts:
-- Does it ignore some genres or moods
-- Does it treat all users as if they have the same taste shape
-- Is it biased toward high energy or one genre by default
-- How could this be unfair if used in a real product
-
----
-
-## 7. Evaluation
-
-How did you check your system
-
-Examples:
-- You tried multiple user profiles and wrote down whether the results matched your expectations
-- You compared your simulation to what a real app like Spotify or YouTube tends to recommend
-- You wrote tests for your scoring logic
-
-You do not need a numeric metric, but if you used one, explain what it measures.
-
----
-
-## 8. Future Work
-
-If you had more time, how would you improve this recommender
-
-Examples:
-
-- Add support for multiple users and "group vibe" recommendations
-- Balance diversity of songs instead of always picking the closest match
-- Use more features, like tempo ranges or lyric themes
-
----
-
-## 9. Personal Reflection
-
-A few sentences about what you learned:
-
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
 
