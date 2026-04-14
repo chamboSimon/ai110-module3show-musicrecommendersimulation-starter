@@ -355,10 +355,61 @@ Read and complete `model_card.md`:
 
 [**Model Card**](model_card.md)
 
-Write 1 to 2 paragraphs here about what you learned:
+---
 
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+### The Biggest Learning Moment
+
+The clearest turning point came during the Edge 2 adversarial test — the "Energy-Mood Conflict" profile where we asked for `energy=0.95` but `mood=chill`. Spacewalk Thoughts, a near-silent ambient track with `energy=0.28`, ranked #1. The energetically correct song sat at #4.
+
+That result made something abstract suddenly concrete: **feature weights are assumptions, and unexamined assumptions produce confident-sounding mistakes.** The system did not malfunction. It followed its rules exactly. The problem was that the rules allowed two label matches to award more points than a large numeric mismatch could subtract. Once you see that happen in real output — once you watch a meditation-room track win over something genuinely intense — the idea of "bias baked into the math" stops being theoretical and becomes obvious.
+
+The lesson: a recommender is not a neutral arbiter. It is a set of priorities written in numbers. Whoever chose the numbers chose the priorities, and the system will defend those priorities even when the result makes no human sense.
+
+---
+
+### How AI Tools Helped — and When to Double-Check Them
+
+AI assistance was most useful during the design phase: thinking through the two-axis model of vibe (arousal × valence), identifying which features carry independent signal versus which are correlated, and suggesting adversarial profile ideas like the Ghost Genre and Dead Centre tests. Those suggestions turned out to be genuinely revealing — the Dead Centre profile in particular exposed a compression problem in the scores that would have been easy to miss by only testing "normal" profiles.
+
+Where human verification mattered:
+
+- **The math.** When the genre weight was halved from +2.0 to +1.0 and energy was doubled from 1.5× to 2.0×, the new maximum score changed from 6.5 to 6.0. The output header still said "/ 6.5" until we caught and corrected it. AI tools generate plausible-looking numbers — checking that they are also correct numbers is always a human responsibility.
+- **Interpreting results.** The Edge 2 output showed Spacewalk Thoughts at #1 with a score of 5.09. Whether that result is "wrong" requires musical judgment, not calculation. The system cannot tell you whether it failed — it can only tell you the score.
+- **Catalog bias.** Choosing which songs to add required noticing what was missing: dark valence, non-Western genres, genre depth beyond lofi. That kind of gap analysis requires knowing what a well-rounded catalog should look like, which is domain knowledge the tool does not have on its own.
+
+---
+
+### What Is Surprising About Simple Algorithms Feeling Like Recommendations
+
+Six numbers and two label comparisons — that is the entire scoring system. No neural network, no listening history, no audio analysis. And yet for the three core profiles, the results pass a basic reasonableness test immediately: the right song is #1, the ordering makes sense, and the explanations feel accurate.
+
+This is both reassuring and unsettling.
+
+It is reassuring because it means the core idea of content-based filtering — match features, rank by closeness — actually works even at tiny scale. You do not need millions of users or deep learning to produce results that feel intuitively right most of the time.
+
+**The surprising part is what "most of the time" conceals.**
+
+The system produces confident-looking output for every profile, including the broken ones. When the wrong song wins, the output does not look different from when the right song wins. The formatting is identical, the explanation reads logically ("genre match (+1.0), mood match (+1.0), energy similarity (+0.66)"), and the score is a reasonable-looking number. There is no signal in the output that tells you whether to trust the result.
+
+This is how real algorithmic harms accumulate. A user who gets a bad recommendation does not see a warning — they see a song title and a confident suggestion. The system never hedges. This is why model cards, bias audits, and adversarial testing exist: the output of a working system and the output of a silently biased one can look completely identical.
+
+**One genuinely unexpected finding:** genre is functioning as a proxy for cultural identity, not just sound. When the system gives a lofi listener a +1.0 bonus and gives a K-pop listener a +0.0 bonus — despite potentially identical energy, valence, and acousticness preferences — it is encoding a hierarchy. One community's taste is represented; the other's is not. The math does not know this. The math is just adding numbers. But the effect is that users from underrepresented musical cultures receive structurally worse recommendations with no explanation, which is a real fairness issue in production systems at scale.
+
+---
+
+### What Would Come Next
+
+**1. Catalog depth over catalog breadth.**
+Adding more songs to each existing genre would do more than adding entirely new genres. Right now the genre bonus always resolves to a single song. With five songs per genre, the numeric axes would actually compete within a genre — which is how Spotify-scale systems work.
+
+**2. A "group session" profile.**
+Blend preferences from two or three users by averaging their target values, then measure how much the recommended songs diverge from each individual's preferences. This would surface a real tension that collaborative systems deal with constantly: optimizing for a group always under-serves someone.
+
+**3. A novelty dial.**
+Add a parameter from 0.0 (pure similarity) to 1.0 (pure surprise) that penalizes songs too close to what the user already likes. Slide it toward 1.0 and the system should start surfacing songs from adjacent but unfamiliar areas of the feature space — modeling the explore/exploit tradeoff that every real recommendation engine has to solve.
+
+**4. Replace hand-crafted features with audio embeddings.**
+Instead of assigning energy and valence by hand, run actual audio files through a pre-trained model (like a MusicNN or a CLAP embedding) and let the model derive the features automatically. The catalog would become self-describing, and features like "sounds like late 90s trip-hop" could emerge without being explicitly programmed.
 
 
 ---
